@@ -1,0 +1,7 @@
+{
+  "name": "Skor Siswa",
+  "description": "Aplikasi penghitungan skor pelanggaran siswa dengan sistem login peran (Guru BK, Guru Piket, Siswa/Wali), rekapitulasi data otomatis, dan notifikasi orang tua.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+

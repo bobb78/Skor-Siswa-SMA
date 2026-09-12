@@ -1,0 +1,111 @@
+name: Build & Sign Android APK
+
+on:
+  push:
+    branches: [ "main", "master" ]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build & Sign APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Grant Execute Permission for Gradlew
+        run: chmod +x gradlew
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      # -------------------------------------------------------------
+      # Step 1: Decode Keystore from GitHub Secret (if configured)
+      # -------------------------------------------------------------
+      - name: Decode Keystore
+        id: decode_keystore
+        if: ${{ secrets.KEYSTORE_BASE64 != '' }}
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          echo "Decoding release keystore from GitHub Secret..."
+          echo "$KEYSTORE_BASE64" | base64 --decode > "${{ runner.temp }}/upload-keystore.jks"
+          echo "keystore_ready=true" >> "$GITHUB_OUTPUT"
+
+      # -------------------------------------------------------------
+      # Step 2: Build Signed Release APK
+      # -------------------------------------------------------------
+      - name: Build Signed Release APK
+        if: steps.decode_keystore.outputs.keystore_ready == 'true'
+        env:
+          KEYSTORE_PATH: ${{ runner.temp }}/upload-keystore.jks
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: ./gradlew assembleRelease --stacktrace
+
+      # -------------------------------------------------------------
+      # Step 3: Build Debug APK (Fallback if Keystore not yet added)
+      # -------------------------------------------------------------
+      - name: Build Debug APK (Fallback)
+        if: steps.decode_keystore.outputs.keystore_ready != 'true'
+        run: |
+          echo "KEYSTORE_BASE64 secret not found. Building Debug APK instead..."
+          ./gradlew assembleDebug --stacktrace
+
+      # -------------------------------------------------------------
+      # Step 4: Securely Remove Temporary Keystore File
+      # -------------------------------------------------------------
+      - name: Clean up sensitive keystore
+        if: always()
+        run: rm -f "${{ runner.temp }}/upload-keystore.jks"
+
+      # -------------------------------------------------------------
+      # Step 5: Upload APK as Workflow Artifact
+      # -------------------------------------------------------------
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Skor-Siswa-SMAN1Keritang-APK
+          path: app/build/outputs/apk/*/*.apk
+
+      # -------------------------------------------------------------
+      # Step 6: Automatically Publish Release on Git Tag (v*)
+      # -------------------------------------------------------------
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: app/build/outputs/apk/*/*.apk
+          name: Release ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          body: |
+            ## 📱 Skor Siswa - SMA NEGERI 1 Keritang (${{ github.ref_name }})
+            
+            Aplikasi resmi kedisiplinan siswa SMA NEGERI 1 Keritang.
+            
+            ### 📥 Panduan Instalasi:
+            1. Unduh berkas APK di bawah ini ke HP Android.
+            2. Buka file yang diunduh dan pilih **Instal** (aktifkan *"Izinkan dari sumber ini / Allow unknown sources"* jika diminta).
+            3. Aplikasi siap digunakan secara offline.
+            
+            **Akun Default:**
+            - **Guru BK / Kesiswaan:** Masukkan PIN `1234`
+            - **Siswa / Wali:** Masukkan NIS Siswa (misal: `1001`)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
