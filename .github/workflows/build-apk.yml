@@ -89,26 +89,27 @@ jobs:
           path: app/build/outputs/apk/**/*.apk
 
       # -------------------------------------------------------------
-      # Buat Rilis Otomatis jika dipicu oleh Git Tag (contoh: v1.0.0)
+      # Buat / Perbarui Rilis Otomatis di menu Releases GitHub
       # -------------------------------------------------------------
-      - name: Create GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
+      - name: Create or Update GitHub Release
+        if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'v1.0.0' }}
           files: app/build/outputs/apk/**/*.apk
-          name: Release ${{ github.ref_name }}
+          name: ${{ startsWith(github.ref, 'refs/tags/v') && format('Release {0}', github.ref_name) || 'Release v1.0.0 (Aplikasi Skor Siswa APK)' }}
           draft: false
           prerelease: false
           generate_release_notes: true
           body: |
-            ## 📱 Skor Siswa - SMA NEGERI 1 Keritang (${{ github.ref_name }})
+            ## 📱 Skor Siswa - SMA NEGERI 1 Keritang
             
             Aplikasi resmi sistem penghitungan skor kedisiplinan siswa SMA NEGERI 1 Keritang.
             
             ### 📥 Panduan Instalasi:
-            1. Unduh berkas APK di bawah ini ke smartphone Android Anda.
-            2. Buka file APK dan pilih **Instal** (Izinkan instalasi dari sumber ini / Unknown sources jika diminta).
-            3. Aplikasi siap digunakan secara offline.
+            1. Unduh berkas APK di bagian **Assets** di bawah ini ke HP Android Anda.
+            2. Buka file APK dan pilih **Instal** (Izinkan instalasi dari *Unknown sources* jika diminta).
+            3. Aplikasi siap digunakan secara offline tanpa internet.
             
             **Akun Default:**
             - **Guru BK / Kesiswaan:** PIN `1234`
