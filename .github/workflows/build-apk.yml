@@ -34,6 +34,23 @@ jobs:
         uses: gradle/actions/setup-gradle@v3
 
       # -------------------------------------------------------------
+      # Siapkan debug.keystore di root directory:
+      # Diperlukan karena debugConfig di Gradle membutuhkan file debug.keystore
+      # yang biasanya terabaikan oleh .gitignore pada runner baru.
+      # -------------------------------------------------------------
+      - name: Prepare Debug Keystore
+        run: |
+          if [ ! -f "debug.keystore" ]; then
+            if [ -f "debug.keystore.base64" ]; then
+              echo "Memulihkan debug.keystore dari file base64..."
+              base64 --decode debug.keystore.base64 > debug.keystore
+            else
+              echo "Membuat debug.keystore baru untuk CI runner..."
+              keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+            fi
+          fi
+
+      # -------------------------------------------------------------
       # Build & Sign APK:
       # Evaluates secrets inside the runner environment (Bash),
       # which prevents the "Unrecognized named-value: 'secrets'" error.
@@ -49,10 +66,10 @@ jobs:
             echo "$KEYSTORE_BASE64" | base64 --decode > "${{ runner.temp }}/upload-keystore.jks"
             export KEYSTORE_PATH="${{ runner.temp }}/upload-keystore.jks"
             echo "Memulai kompilasi Release APK bertanda tangan (signed)..."
-            ./gradlew assembleRelease --stacktrace
+            ./gradlew assembleRelease --stacktrace --no-daemon
           else
             echo "Secret KEYSTORE_BASE64 belum dipasang. Mem-build Debug APK..."
-            ./gradlew assembleDebug --stacktrace
+            ./gradlew assembleDebug --stacktrace --no-daemon
           fi
 
       # -------------------------------------------------------------
